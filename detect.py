@@ -46,6 +46,11 @@ from utils.general import (LOGGER, Profile, check_file, check_img_size, check_im
 from utils.plots import Annotator, colors, save_one_box
 from utils.torch_utils import select_device, smart_inference_mode
 
+from utils.counter import draw_roi
+
+X_AXIS = 0  # right <-> left street
+Y_AXIS = 1  #    up <-> down
+
 
 @smart_inference_mode()
 def run(
@@ -90,6 +95,9 @@ def run(
     save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
     (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
+    # Street direction
+    mode = X_AXIS
+
     # Load model
     device = select_device(device)
     model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data, fp16=half)
@@ -131,6 +139,11 @@ def run(
         # Second-stage classifier (optional)
         # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
 
+        # number of obejcts inside and outside of the roi bound
+        object_situation = {"inside": 0, "outside": 0}
+        pre_object_situation = {"inside": 0, "outside": 0}
+        
+
         # Process predictions
         for i, det in enumerate(pred):  # per image
             seen += 1
@@ -147,6 +160,14 @@ def run(
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
+            
+            ''' 
+                We define a roi and count the number of objects inside and outside of the roi. 
+                Between each two frames, we compare the differences between the inside and outside objects.
+                Then we use the minimum number as the number of motorcylces.
+            '''
+            roi_bound_coordinates = draw_roi(im0, mode)
+            
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
@@ -155,7 +176,8 @@ def run(
                 for c in det[:, 5].unique():
                     n = (det[:, 5] == c).sum()  # detections per class
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
-
+                
+                object_centers = []
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
                     if save_txt:  # Write to file
