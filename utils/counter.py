@@ -32,4 +32,3 @@ def draw_axis(image, roi_position, color, thickness):
     cv2.line(image, line1[1], line1[0], color, thickness)
     cv2.line(image, line2[1], line2[0], color, thickness)
 
-
