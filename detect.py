@@ -166,7 +166,7 @@ def run(
                 Between each two frames, we compare the differences between the inside and outside objects.
                 Then we use the minimum number as the number of motorcylces.
             '''
-            roi_bound_coordinates = draw_roi(im0, mode)
+            roi_bound_coordinates = draw_roi(im0, mode=0)
             
             if len(det):
                 # Rescale boxes from img_size to im0 size
