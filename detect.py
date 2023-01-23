@@ -46,7 +46,7 @@ from utils.general import (LOGGER, Profile, check_file, check_img_size, check_im
 from utils.plots import Annotator, colors, save_one_box
 from utils.torch_utils import select_device, smart_inference_mode
 
-from utils.counter import draw_roi
+from utils.counter import draw_roi, object_position
 
 X_AXIS = 0  # right <-> left street
 Y_AXIS = 1  #    up <-> down
@@ -95,8 +95,11 @@ def run(
     save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
     (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
+    # Counter parameters
+    object_counter = 0
+
     # Street direction
-    mode = X_AXIS
+    mode = Y_AXIS
 
     # Load model
     device = select_device(device)
@@ -119,6 +122,11 @@ def run(
     # Run inference
     model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))  # warmup
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
+
+    # number of obejcts inside and outside of the roi bound
+    # object_situation_list = {"inside": 0, "outside": 0}
+    pre_object_situation_list = {"inside": 0, "outside": 0}
+
     for path, im, im0s, vid_cap, s in dataset:
         with dt[0]:
             im = torch.from_numpy(im).to(model.device)
@@ -139,10 +147,9 @@ def run(
         # Second-stage classifier (optional)
         # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
 
-        # number of obejcts inside and outside of the roi bound
-        object_situation = {"inside": 0, "outside": 0}
-        pre_object_situation = {"inside": 0, "outside": 0}
-        
+        # # number of obejcts inside and outside of the roi bound
+        # # object_situation_list = {"inside": 0, "outside": 0}
+        # pre_object_situation_list = {"inside": 0, "outside": 0}
 
         # Process predictions
         for i, det in enumerate(pred):  # per image
@@ -152,6 +159,8 @@ def run(
                 s += f'{i}: '
             else:
                 p, im0, frame = path, im0s.copy(), getattr(dataset, 'frame', 0)
+
+            object_situation_list = {"inside": 0, "outside": 0}
 
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # im.jpg
@@ -166,9 +175,11 @@ def run(
                 Between each two frames, we compare the differences between the inside and outside objects.
                 Then we use the minimum number as the number of motorcylces.
             '''
-            roi_bound_coordinates = draw_roi(im0, mode=0)
+            roi_bound_coordinates = draw_roi(im0, mode)
             
             if len(det):
+                # cv2.putText(im0, f'{len(det)}', (500, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
 
@@ -177,9 +188,13 @@ def run(
                     n = (det[:, 5] == c).sum()  # detections per class
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
                 
-                object_centers = []
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
+                    if object_position(im0, xyxy, roi_bound_coordinates) is True:
+                        object_situation_list["inside"] += 1
+                    else:
+                        object_situation_list["outside"] += 1
+
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                         line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
@@ -193,6 +208,24 @@ def run(
                     if save_crop:
                         save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
 
+                # Different of number of objects inside/outside of RoI between current and previous frame
+                inside_diff = object_situation_list["inside"] - pre_object_situation_list["inside"]
+                outside_diff = object_situation_list["outside"] - pre_object_situation_list["outside"]
+
+                if inside_diff > 0:
+                    object_counter += int(abs(inside_diff - outside_diff)/2)
+
+                print(f'{object_situation_list["inside"]} objects are inside the RoI')
+                print(f'{object_situation_list["outside"]} objects are outside the RoI')
+                print(f'{pre_object_situation_list["inside"]} objects are inside the RoI pre')
+                print(f'{pre_object_situation_list["outside"]} objects are outside the RoI pre')
+                print(inside_diff, outside_diff)
+
+                pre_object_situation_list["inside"] = object_situation_list["inside"]
+                pre_object_situation_list["outside"] = object_situation_list["outside"]
+            
+            cv2.putText(im0, f'{object_counter}', (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
             # Stream results
             im0 = annotator.result()
             if view_img:
@@ -201,7 +234,7 @@ def run(
                     cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
                     cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
                 cv2.imshow(str(p), im0)
-                cv2.waitKey(1)  # 1 millisecond
+                cv2.waitKey(0)  # 1 millisecond
 
             # Save results (image with detections)
             if save_img:
