@@ -1,13 +1,11 @@
 # YOLOv5 🚀 by Ultralytics, GPL-3.0 license
 """
-PyTorch Hub models https://pytorch.org/hub/ultralytics_yolov5
+PyTorch Hub models https://pytorch.org/hub/ultralytics_yolov5/
 
 Usage:
     import torch
-    model = torch.hub.load('ultralytics/yolov5', 'yolov5s')  # official model
-    model = torch.hub.load('ultralytics/yolov5:master', 'yolov5s')  # from branch
-    model = torch.hub.load('ultralytics/yolov5', 'custom', 'yolov5s.pt')  # custom/local model
-    model = torch.hub.load('.', 'custom', 'yolov5s.pt', source='local')  # local repo
+    model = torch.hub.load('ultralytics/yolov5', 'yolov5s')
+    model = torch.hub.load('ultralytics/yolov5:master', 'custom', 'path/to/yolov5s.onnx')  # file from branch
 """
 
 import torch
@@ -31,36 +29,26 @@ def _create(name, pretrained=True, channels=3, classes=80, autoshape=True, verbo
     from pathlib import Path
 
     from models.common import AutoShape, DetectMultiBackend
-    from models.experimental import attempt_load
-    from models.yolo import ClassificationModel, DetectionModel, SegmentationModel
+    from models.yolo import Model
     from utils.downloads import attempt_download
     from utils.general import LOGGER, check_requirements, intersect_dicts, logging
     from utils.torch_utils import select_device
 
     if not verbose:
         LOGGER.setLevel(logging.WARNING)
-    check_requirements(exclude=('opencv-python', 'tensorboard', 'thop'))
+
+    check_requirements(exclude=('tensorboard', 'thop', 'opencv-python'))
     name = Path(name)
     path = name.with_suffix('.pt') if name.suffix == '' and not name.is_dir() else name  # checkpoint path
     try:
-        device = select_device(device)
+        device = select_device(('0' if torch.cuda.is_available() else 'cpu') if device is None else device)
+
         if pretrained and channels == 3 and classes == 80:
-            try:
-                model = DetectMultiBackend(path, device=device, fuse=autoshape)  # detection model
-                if autoshape:
-                    if model.pt and isinstance(model.model, ClassificationModel):
-                        LOGGER.warning('WARNING ⚠️ YOLOv5 ClassificationModel is not yet AutoShape compatible. '
-                                       'You must pass torch tensors in BCHW to this model, i.e. shape(1,3,224,224).')
-                    elif model.pt and isinstance(model.model, SegmentationModel):
-                        LOGGER.warning('WARNING ⚠️ YOLOv5 SegmentationModel is not yet AutoShape compatible. '
-                                       'You will not be able to run inference with this model.')
-                    else:
-                        model = AutoShape(model)  # for file/URI/PIL/cv2/np inputs and NMS
-            except Exception:
-                model = attempt_load(path, device=device, fuse=False)  # arbitrary model
+            model = DetectMultiBackend(path, device=device)  # download/load FP32 model
+            # model = models.experimental.attempt_load(path, map_location=device)  # download/load FP32 model
         else:
             cfg = list((Path(__file__).parent / 'models').rglob(f'{path.stem}.yaml'))[0]  # model.yaml path
-            model = DetectionModel(cfg, channels, classes)  # create model
+            model = Model(cfg, channels, classes)  # create model
             if pretrained:
                 ckpt = torch.load(attempt_download(path), map_location=device)  # load
                 csd = ckpt['model'].float().state_dict()  # checkpoint state_dict as FP32
@@ -68,8 +56,8 @@ def _create(name, pretrained=True, channels=3, classes=80, autoshape=True, verbo
                 model.load_state_dict(csd, strict=False)  # load
                 if len(ckpt['model'].names) == classes:
                     model.names = ckpt['model'].names  # set class names attribute
-        if not verbose:
-            LOGGER.setLevel(logging.INFO)  # reset to default
+        if autoshape:
+            model = AutoShape(model)  # for file/URI/PIL/cv2/np inputs and NMS
         return model.to(device)
 
     except Exception as e:
@@ -134,25 +122,17 @@ def yolov5x6(pretrained=True, channels=3, classes=80, autoshape=True, _verbose=T
 
 
 if __name__ == '__main__':
-    import argparse
+    model = _create(name='yolov5s', pretrained=True, channels=3, classes=80, autoshape=True, verbose=True)
+    # model = custom(path='path/to/model.pt')  # custom
+
+    # Verify inference
     from pathlib import Path
 
     import numpy as np
     from PIL import Image
 
-    from utils.general import cv2, print_args
+    from utils.general import cv2
 
-    # Argparser
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='yolov5s', help='model name')
-    opt = parser.parse_args()
-    print_args(vars(opt))
-
-    # Model
-    model = _create(name=opt.model, pretrained=True, channels=3, classes=80, autoshape=True, verbose=True)
-    # model = custom(path='path/to/model.pt')  # custom
-
-    # Images
     imgs = [
         'data/images/zidane.jpg',  # filename
         Path('data/images/zidane.jpg'),  # Path
@@ -161,9 +141,6 @@ if __name__ == '__main__':
         Image.open('data/images/bus.jpg'),  # PIL
         np.zeros((320, 640, 3))]  # numpy
 
-    # Inference
     results = model(imgs, size=320)  # batched inference
-
-    # Results
     results.print()
     results.save()

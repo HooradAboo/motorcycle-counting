@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['motorcycle']
+
+roboflow:
+  workspace: vmt
+  project: motorcycle-detection-ua5kl
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/vmt/motorcycle-detection-ua5kl/dataset/1
