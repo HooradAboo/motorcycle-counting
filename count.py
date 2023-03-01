@@ -42,7 +42,7 @@ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 @torch.no_grad()
 def run(
-        weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
+        weights=ROOT / 'weights/yolov5s.pt',  # model.pt path(s)
         source=ROOT / 'data/images',  # file/dir/URL/glob, 0 for webcam
         data=ROOT / 'data/coco128.yaml',  # dataset.yaml path
         imgsz=(640, 640),  # inference size (height, width)
@@ -225,7 +225,7 @@ def run(
                     cv2.rectangle(im0, top_left, top_right, (255, 0, 0), -1)
                     cv2.putText(im0, txt, org, cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1)
 
-                    cv2.putText(im0, f'{len(object_ids)-1} objects detected.', (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 0, 0), 2)
+                    # cv2.putText(im0, f'{len(object_ids)-1} objects detected.', (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 0, 0), 2)
 
                     # DeepSORT -> Saving Track predictions into a text file.
                     save_format = '{frame},{id},{x1},{y1},{w},{h},{x},{y},{z}\n'
@@ -237,6 +237,8 @@ def run(
 
             # Stream results
             im0 = annotator.result()
+            cv2.putText(im0, f'{len(object_ids)-1} objects detected.', (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+
 
             # Save results (image with detections and tracks)
             if save_img:
@@ -274,7 +276,7 @@ def parse_opt():
     parser.add_argument('--source', type=str, default=ROOT / 'data/images', help='file/dir/URL/glob, 0 for webcam')
     parser.add_argument('--data', type=str, default=ROOT / 'data/coco128.yaml', help='(optional) dataset.yaml path')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
-    parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
+    parser.add_argument('--conf-thres', type=float, default=0.80, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
@@ -308,5 +310,7 @@ def main(opt):
 
 
 if __name__ == "__main__":
+    t = time_sync()
     opt = parse_opt()
     main(opt)
+    LOGGER.info(f'Executaion Time: {((time_sync() - t)/60)}s')
