@@ -15,7 +15,7 @@ Usage - sources:
 from utils.torch_utils import select_device, time_sync
 from utils.plots import Annotator, colors, save_one_box
 from utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr, cv2,
-                           increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh, center)
+                           increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh, center, draw_roi, in_region)
 from utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
 from models.common import DetectMultiBackend
 from deep_sort.tools import generate_detections as gdet
@@ -157,6 +157,10 @@ def run(
             imc = im0.copy() if save_crop else im0  # for save_crop
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
 
+            # Draw the Rigion of Intrest in the frames
+            region = (0, 150, im0.shape[1], 350)
+            draw_roi(im0, region)
+
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
@@ -180,6 +184,8 @@ def run(
                     cen = center(xyxy)
                     # print("center", cen)
                     cv2.circle(im0, cen, 2, (0, 0, 255), 1)
+                    
+
 
                     if save_img or save_crop or view_img:  # Add bbox to image
                         c = int(cls)  # integer class

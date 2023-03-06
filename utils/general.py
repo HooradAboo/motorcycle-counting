@@ -646,6 +646,20 @@ def center(x):
     return (int(cx), int(cy))
 
 
+def in_region(c, roi):
+    # If the center point is in the Region of Intrest, it returns True.
+    if roi[0] < c[0] < roi[2]:
+        if roi[1] < c[1] < roi[3]:
+            return True
+    return False
+
+
+def draw_roi(frame, roi, color=(255, 0, 0), thickness=1):
+    top_left = (roi[0], roi[1])
+    bottom_right = (roi[2], roi[3])
+    cv2.rectangle(frame, top_left, bottom_right, color, thickness)
+
+
 def xyxy2xywh(x):
     # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h] where xy1=top-left, xy2=bottom-right
     y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
