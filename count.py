@@ -15,7 +15,7 @@ Usage - sources:
 from utils.torch_utils import select_device, time_sync
 from utils.plots import Annotator, colors, save_one_box
 from utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr, cv2,
-                           increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
+                           increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh, center)
 from utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
 from models.common import DetectMultiBackend
 from deep_sort.tools import generate_detections as gdet
@@ -174,6 +174,13 @@ def run(
                         with open(f'{txt_path}.txt', 'a') as f:
                             f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
+                    # xywh = (torch.tensor(xyxy).view(1, 4)).view(-1).tolist() 
+                    # print(xywh)
+                    # cen = (center(torch.tensor(xyxy).view(1, 4))).view(-1).tolist()
+                    cen = center(xyxy)
+                    # print("center", cen)
+                    cv2.circle(im0, cen, 2, (0, 0, 255), 1)
+
                     if save_img or save_crop or view_img:  # Add bbox to image
                         c = int(cls)  # integer class
                         label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
@@ -260,7 +267,7 @@ def run(
                     vid_writer[i].write(im0)
 
         # Print time (inference-only)
-        LOGGER.info(f'{s}Done. ({t3 - t2:.3f}s)')
+        # LOGGER.info(f'{s}Done. ({t3 - t2:.3f}s)')
 
     # Print results
     t = tuple(x / seen * 1E3 for x in dt)  # speeds per image

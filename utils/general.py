@@ -641,6 +641,11 @@ def coco80_to_coco91_class():  # converts 80-index (val2014) to 91-index (paper)
     return x
 
 
+def center(x):
+    cx, cy, _, _ = (xyxy2xywh(torch.tensor(x).view(1, 4))).view(-1).tolist()
+    return (int(cx), int(cy))
+
+
 def xyxy2xywh(x):
     # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h] where xy1=top-left, xy2=bottom-right
     y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
