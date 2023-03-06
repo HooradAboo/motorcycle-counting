@@ -15,7 +15,7 @@ Usage - sources:
 from utils.torch_utils import select_device, time_sync
 from utils.plots import Annotator, colors, save_one_box
 from utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr, cv2,
-                           increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh, center, draw_roi, in_region)
+                           increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh, get_center, draw_roi, in_region)
 from utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
 from models.common import DetectMultiBackend
 from deep_sort.tools import generate_detections as gdet
@@ -181,9 +181,9 @@ def run(
                     # xywh = (torch.tensor(xyxy).view(1, 4)).view(-1).tolist() 
                     # print(xywh)
                     # cen = (center(torch.tensor(xyxy).view(1, 4))).view(-1).tolist()
-                    cen = center(xyxy)
+                    center = get_center(xyxy)
                     # print("center", cen)
-                    cv2.circle(im0, cen, 2, (0, 0, 255), 1)
+                    cv2.circle(im0, center, 2, (0, 0, 255), 3)
                     
 
 
@@ -221,8 +221,9 @@ def run(
                 for track in tracker.tracks:
                     if not track.is_confirmed() or track.time_since_update > 1:
                         continue
-
-                    object_ids.add(track.track_id)
+                    
+                    if in_region(center, region):
+                        object_ids.add(track.track_id)
 
                     # DeepSORT -> Changing track bbox to top left, bottom right coordinates
                     bbox = list(track.to_tlbr())

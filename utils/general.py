@@ -641,7 +641,7 @@ def coco80_to_coco91_class():  # converts 80-index (val2014) to 91-index (paper)
     return x
 
 
-def center(x):
+def get_center(x):
     cx, cy, _, _ = (xyxy2xywh(torch.tensor(x).view(1, 4))).view(-1).tolist()
     return (int(cx), int(cy))
 
